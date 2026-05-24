@@ -17,7 +17,7 @@ Here are some screenshots of the `in_app_gallery` plugin in action:
   <img src="https://raw.githubusercontent.com/MusabNawab/in_app_gallery/main/screenshots/1.png" width="200" alt="Showcase 1"/>
   <img src="https://raw.githubusercontent.com/MusabNawab/in_app_gallery/main/screenshots/2.png" width="200" alt="Showcase 2"/>
   <img src="https://raw.githubusercontent.com/MusabNawab/in_app_gallery/main/screenshots/3.png" width="200" alt="Showcase 3"/>
-  <img src="https://raw.githubusercontent.com/MusabNawab/in_app_gallery/main/screenshots/4.png" width="200" alt="Showcase 4"/>
+  <img src="https://raw.githubusercontent.com/MusabNawab/in_app_gallery/main/screenshots/4.jpg" width="200" alt="Showcase 4"/>
 </p>
 
 *(Note to developer: Create a `screenshots` folder in your repository, place the 4 images you provided as `1.png`, `2.png`, `3.png`, and `4.png`, and update the image URLs to point to your actual repository).*
