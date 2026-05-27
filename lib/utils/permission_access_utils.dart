@@ -79,4 +79,26 @@ class PermissionAccessUtils {
     final status = await Permission.photos.request();
     return handlePermissionResult([status], "Gallery");
   }
+
+  /// Checks if the photo/video gallery permissions are currently granted or limited,
+  /// without triggering a permission request dialog.
+  static Future<bool> hasGalleryPermission() async {
+    if (Platform.isAndroid) {
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+
+      if (androidInfo.version.sdkInt >= 33) {
+        final photoStatus = await Permission.photos.status;
+        final videoStatus = await Permission.videos.status;
+        return (photoStatus.isGranted || photoStatus.isLimited) &&
+            (videoStatus.isGranted || videoStatus.isLimited);
+      } else {
+        final storageStatus = await Permission.storage.status;
+        return storageStatus.isGranted || storageStatus.isLimited;
+      }
+    }
+
+    // For iOS and others
+    final status = await Permission.photos.status;
+    return status.isGranted || status.isLimited;
+  }
 }

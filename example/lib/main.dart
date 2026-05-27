@@ -43,9 +43,9 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
 
-    if (result != null && result is List<File>) {
+    if (result != null && result is List) {
       setState(() {
-        _selectedMedia = result;
+        _selectedMedia = List<File>.from(result);
       });
     }
   }
@@ -70,11 +70,12 @@ class _MyHomePageState extends State<MyHomePage> {
               child: _selectedMedia.isEmpty
                   ? const Center(child: Text('No media selected'))
                   : GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 4,
-                        mainAxisSpacing: 4,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 4,
+                            mainAxisSpacing: 4,
+                          ),
                       itemCount: _selectedMedia.length,
                       itemBuilder: (context, index) {
                         return Image.file(

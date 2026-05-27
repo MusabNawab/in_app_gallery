@@ -23,10 +23,11 @@ class PickCameraWidget extends StatelessWidget {
     final textTheme = theme.textTheme;
     return InkWell(
       onTap: () async {
-        await InAppGalleryUtils.onCameraPicked(
+        final result = await InAppGalleryUtils.onCameraPicked(
           context: context,
           imageQuality: imageQuality,
         );
+        pickedImage(result);
       },
       child:
           cameraWidget ??

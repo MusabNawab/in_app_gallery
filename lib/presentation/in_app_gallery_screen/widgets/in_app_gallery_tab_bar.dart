@@ -5,10 +5,14 @@ class InAppGalleryTabBar extends StatelessWidget {
     super.key,
     required this.tabController,
     this.tabBarIndicatorSize,
+    required this.imagesTabText,
+    required this.videosTabText,
   });
 
   final TabController tabController;
   final TabBarIndicatorSize? tabBarIndicatorSize;
+  final String imagesTabText;
+  final String videosTabText;
 
   @override
   Widget build(BuildContext context) {
@@ -35,9 +39,9 @@ class InAppGalleryTabBar extends StatelessWidget {
       labelColor: Colors.white,
       unselectedLabelColor: tabBarTheme.unselectedLabelColor ?? Colors.grey,
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      tabs: const [
-        Tab(text: 'Images', height: 36),
-        Tab(text: 'Videos', height: 36),
+      tabs: [
+        Tab(text: imagesTabText, height: 36),
+        Tab(text: videosTabText, height: 36),
       ],
     );
   }

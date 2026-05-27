@@ -34,5 +34,5 @@ class Constants {
 
   // Toasts / Errors
   static String videoSizeExceeded(String filename) =>
-      "Skipped $filename: size > 500 MB";
+      "Skipped $filename: size > 1.5 GB";
 }

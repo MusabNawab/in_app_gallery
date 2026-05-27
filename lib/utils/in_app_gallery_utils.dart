@@ -2,11 +2,12 @@ import 'dart:developer';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:hw_video_compress/hw_video_compress.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:uuid/uuid.dart';
 
 import 'permission_access_utils.dart';
@@ -15,25 +16,19 @@ import 'permission_access_utils.dart';
 /// Provides methods to handle camera picking, media selection processing,
 /// and video/image compression.
 class InAppGalleryUtils {
-  static const MethodChannel _videoCompressorChannel = MethodChannel(
-    'video_compressor',
-  );
-  static const EventChannel _progressChannel = EventChannel(
-    'video_compressor_progress',
-  );
+  static final HwVideoCompress _hwVideoCompress = HwVideoCompress();
 
   /// Opens the device camera to take a photo.
-  /// Checks for camera permissions first, and shows a permission dialog if denied.
+  /// Checks for camera permissions first, and shows a settings permission dialog if permanently denied.
   /// Returns the picked [File] or null if the user cancelled or denied permission.
   static Future<File?> onCameraPicked({
     required BuildContext context,
     int? imageQuality,
   }) async {
     try {
-      final hasPermission =
-          await PermissionAccessUtils.checkCameraPermissions();
+      final status = await Permission.camera.status;
 
-      if (!hasPermission) {
+      if (status.isPermanentlyDenied) {
         // Check if context is still mounted before using it across an async gap
         if (!context.mounted) return null;
         await PermissionAccessUtils.showPermissionDialog(context, 'Camera');
@@ -68,7 +63,7 @@ class InAppGalleryUtils {
     void Function(int current, int total)? onProgress,
   }) async {
     final List<File> finalFiles = [];
-    const int maxVideoSizeBytes = 500 * 1024 * 1024; // 500 MB
+    const int maxVideoSizeBytes = 1500 * 1024 * 1024; // 1.5 GB
     final int totalFiles = selectedMedia.length;
     int currentFileIndex = 1;
 
@@ -133,9 +128,7 @@ class InAppGalleryUtils {
 
   /// Stream of compression progress (0.0 to 1.0)
   static Stream<double> get progressStream {
-    return _progressChannel.receiveBroadcastStream().map(
-      (event) => (event as num).toDouble(),
-    );
+    return _hwVideoCompress.onProgress;
   }
 
   /// Compresses an image and returns the compressed file.
@@ -174,9 +167,8 @@ class InAppGalleryUtils {
         return file;
       }
 
-      final String? compressedPath = await _videoCompressorChannel.invokeMethod(
-        'compressVideo',
-        {'inputPath': file.path},
+      final String? compressedPath = await _hwVideoCompress.compressVideo(
+        file.path,
       );
 
       if (compressedPath != null) {

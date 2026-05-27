@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../../logic/cubit/in_app_gallery_cubit.dart';
@@ -29,8 +30,13 @@ class InAppGalleryScreen extends StatefulWidget {
   /// If true, the gallery will only show videos. Default is false.
   final bool? onlyVideos;
 
-  /// Custom app bar builder. Receives the current number of selected files.
-  final PreferredSizeWidget Function(int fileCount)? appBar;
+  /// Custom app bar builder. Receives the current number of selected files
+  /// and a callback to trigger selection completion.
+  final PreferredSizeWidget Function(
+    int fileCount,
+    VoidCallback onSelectionComplete,
+  )?
+  appBar;
 
   /// Custom widget to display the camera option in the grid.
   final Widget? cameraWidget;
@@ -75,6 +81,12 @@ class InAppGalleryScreen extends StatefulWidget {
   /// Title displayed on the default App Bar.
   final String title;
 
+  /// Custom text for the Images tab. Default is 'Images'.
+  final String imagesTabText;
+
+  /// Custom text for the Videos tab. Default is 'Videos'.
+  final String videosTabText;
+
   const InAppGalleryScreen({
     super.key,
     this.allowVideoCompression = false,
@@ -94,6 +106,8 @@ class InAppGalleryScreen extends StatefulWidget {
     this.tabBarIndicatorSize = TabBarIndicatorSize.tab,
     this.theme,
     this.title = 'Gallery',
+    this.imagesTabText = 'Images',
+    this.videosTabText = 'Videos',
   });
 
   @override
@@ -109,6 +123,7 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
 
   bool _isCheckingPermission = true;
   bool _hasPermission = false;
+  bool _checking = false;
 
   bool get _showImages => widget.onlyVideos == true ? false : true;
   bool get _showVideos => widget.onlyImages == true ? false : true;
@@ -117,6 +132,7 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
   @override
   void initState() {
     super.initState();
+    MediaKit.ensureInitialized();
     WidgetsBinding.instance.addObserver(this);
     PhotoManager.setIgnorePermissionCheck(true);
     _cubit = InAppGalleryCubit();
@@ -136,7 +152,7 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && !_hasPermission) {
-      _checkPermissions();
+      _checkPermissions(request: false);
     }
   }
 
@@ -150,12 +166,17 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
     super.dispose();
   }
 
-  Future<void> _checkPermissions() async {
+  Future<void> _checkPermissions({bool request = true}) async {
+    if (_checking) return;
+    _checking = true;
+
     setState(() {
       _isCheckingPermission = true;
     });
 
-    final hasGallery = await PermissionAccessUtils.checkGalleryPermissions();
+    final hasGallery = request
+        ? await PermissionAccessUtils.checkGalleryPermissions()
+        : await PermissionAccessUtils.hasGalleryPermission();
 
     if (mounted) {
       setState(() {
@@ -170,6 +191,49 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
         if (_showVideos && _cubit.state.galleryVideos.isEmpty) {
           _cubit.getVideos();
         }
+      }
+    }
+    _checking = false;
+  }
+
+  Future<void> _onSelectionComplete() async {
+    _cubit.setProcessing(true);
+    try {
+      final files = await InAppGalleryUtils.onSelectionCompleted(
+        imageQuality: widget.imageQuality,
+        selectedMedia: _cubit.state.selectedMedia,
+        allowVideoCompression: widget.allowVideoCompression,
+        onVideoSizeExceeded: (filename) {
+          if (widget.onVideoSizeExceeded != null) {
+            widget.onVideoSizeExceeded!(filename);
+          } else {
+            Fluttertoast.showToast(
+              msg: Constants.videoSizeExceeded(filename),
+              backgroundColor: Colors.yellow,
+              textColor: Colors.white,
+            );
+          }
+        },
+        onProgress: (current, total) {
+          _cubit.setProcessing(
+            true,
+            processingCurrent: current,
+            processingTotal: total,
+          );
+        },
+      );
+
+      if (mounted) {
+        _cubit.setProcessing(false);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Navigator.pop(context, files);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _cubit.setProcessing(false);
       }
     }
   }
@@ -226,58 +290,11 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
             final fileCount = state.selectedMedia.length;
             return Scaffold(
               appBar: widget.appBar != null
-                  ? widget.appBar!(fileCount)
+                  ? widget.appBar!(fileCount, _onSelectionComplete)
                   : InAppGalleryAppBar(
                       title: widget.title,
                       fileCount: fileCount,
-                      onDone: () async {
-                        context.read<InAppGalleryCubit>().setProcessing(true);
-                        try {
-                          final files =
-                              await InAppGalleryUtils.onSelectionCompleted(
-                                imageQuality: widget.imageQuality,
-                                selectedMedia: state.selectedMedia,
-                                allowVideoCompression:
-                                    widget.allowVideoCompression,
-                                onVideoSizeExceeded: (filename) {
-                                  if (widget.onVideoSizeExceeded != null) {
-                                    widget.onVideoSizeExceeded!(filename);
-                                  } else {
-                                    Fluttertoast.showToast(
-                                      msg: Constants.videoSizeExceeded(
-                                        filename,
-                                      ),
-                                      backgroundColor: Colors.yellow,
-                                      textColor: Colors
-                                          .black, // Added for better contrast
-                                    );
-                                  }
-                                },
-                                onProgress: (current, total) {
-                                  context
-                                      .read<InAppGalleryCubit>()
-                                      .setProcessing(
-                                        true,
-                                        processingCurrent: current,
-                                        processingTotal: total,
-                                      );
-                                },
-                              );
-
-                          if (context.mounted) {
-                            context.read<InAppGalleryCubit>().setProcessing(
-                              false,
-                            );
-                            Navigator.pop(context, files);
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            context.read<InAppGalleryCubit>().setProcessing(
-                              false,
-                            );
-                          }
-                        }
-                      },
+                      onDone: _onSelectionComplete,
                     ),
               body: SafeArea(
                 child: _isCheckingPermission
@@ -292,6 +309,8 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
                             InAppGalleryTabBar(
                               tabController: _tabController,
                               tabBarIndicatorSize: widget.tabBarIndicatorSize,
+                              imagesTabText: widget.imagesTabText,
+                              videosTabText: widget.videosTabText,
                             ),
                           Expanded(
                             child:
@@ -377,8 +396,8 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
   }
 
   void onScroll(ScrollController controller, VoidCallback onMaxExtent) {
-    if (_imagesScrollController.position.pixels >=
-        _imagesScrollController.position.maxScrollExtent - 200) {
+    if (controller.position.pixels >=
+        controller.position.maxScrollExtent - 200) {
       onMaxExtent();
     }
   }
