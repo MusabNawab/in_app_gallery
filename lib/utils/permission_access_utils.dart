@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -60,19 +59,23 @@ class PermissionAccessUtils {
   }
 
   /// Requests and checks if the photo/video gallery permissions are granted.
-  /// Handles platform-specific logic for Android versions >= 33 and iOS.
   static Future<bool> checkGalleryPermissions() async {
     if (Platform.isAndroid) {
-      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      // 1. Try requesting Android 13+ granular media permissions first.
+      // (On Android 12-, this instantly resolves to denied without a prompt).
+      final statuses = await [Permission.photos, Permission.videos].request();
+      final isMediaGranted = statuses.values.every(
+        (status) => status.isGranted || status.isLimited,
+      );
 
-      if (androidInfo.version.sdkInt >= 33) {
-        final statuses = await [Permission.photos, Permission.videos].request();
-
-        return handlePermissionResult(statuses.values.toList(), "Gallery");
-      } else {
-        final status = await Permission.storage.request();
-        return handlePermissionResult([status], "Storage");
+      if (isMediaGranted) {
+        return true;
       }
+
+      // 2. Fallback to legacy storage permission for Android 12 and below.
+      // (On Android 13+, this instantly resolves to denied without a prompt).
+      final storageStatus = await Permission.storage.request();
+      return handlePermissionResult([storageStatus], "Gallery");
     }
 
     // For iOS and others
@@ -84,17 +87,20 @@ class PermissionAccessUtils {
   /// without triggering a permission request dialog.
   static Future<bool> hasGalleryPermission() async {
     if (Platform.isAndroid) {
-      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      final photoStatus = await Permission.photos.status;
+      final videoStatus = await Permission.videos.status;
 
-      if (androidInfo.version.sdkInt >= 33) {
-        final photoStatus = await Permission.photos.status;
-        final videoStatus = await Permission.videos.status;
-        return (photoStatus.isGranted || photoStatus.isLimited) &&
-            (videoStatus.isGranted || videoStatus.isLimited);
-      } else {
-        final storageStatus = await Permission.storage.status;
-        return storageStatus.isGranted || storageStatus.isLimited;
+      final isMediaGranted =
+          (photoStatus.isGranted || photoStatus.isLimited) &&
+          (videoStatus.isGranted || videoStatus.isLimited);
+
+      if (isMediaGranted) {
+        return true;
       }
+
+      // Fallback check for Android 12 and below
+      final storageStatus = await Permission.storage.status;
+      return storageStatus.isGranted || storageStatus.isLimited;
     }
 
     // For iOS and others

@@ -1,3 +1,7 @@
+## 1.0.2
+
+* **Dependency Cleanup**: Removed `device_info_plus` due to compatibility conflicts with the file picker.
+
 ## 1.0.1
 
 * **Pure Dart Package**: Restructured the project from a native plugin to a pure Dart package by removing local native folders and dependencies.
