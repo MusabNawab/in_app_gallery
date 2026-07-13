@@ -1,3 +1,10 @@
+## 1.0.3
+
+* **Build & JVM Compatibility**: 
+  * Downgraded the example app configuration to Java 17 / JVM 17 for better compatibility.
+  * Aligned both Java and Kotlin compiler targets in the example app to avoid target mismatch errors.
+  * Bypassed Kotlin JVM target validation checks for third-party dependencies (like `photo_manager`) to resolve build errors on systems running Java 21.
+
 ## 1.0.2
 
 * **Dependency Cleanup**: Removed `device_info_plus` due to compatibility conflicts with the file picker.
