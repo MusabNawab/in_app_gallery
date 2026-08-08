@@ -1,5 +1,6 @@
 import 'dart:developer';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -18,12 +19,13 @@ import 'permission_access_utils.dart';
 class InAppGalleryUtils {
   static final HwVideoCompress _hwVideoCompress = HwVideoCompress();
 
-  /// Opens the device camera to take a photo.
+  /// Opens the device camera to take a photo or record a video.
   /// Checks for camera permissions first, and shows a settings permission dialog if permanently denied.
   /// Returns the picked [File] or null if the user cancelled or denied permission.
   static Future<File?> onCameraPicked({
     required BuildContext context,
     int? imageQuality,
+    bool isVideo = false,
   }) async {
     try {
       final status = await Permission.camera.status;
@@ -36,20 +38,32 @@ class InAppGalleryUtils {
       }
 
       final picker = ImagePicker();
-      // Use the built-in imageQuality parameter to save memory and processing time
-      final pickedFile = await picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: imageQuality,
-      );
+      final XFile? pickedFile;
+      if (isVideo) {
+        pickedFile = await picker.pickVideo(source: ImageSource.camera);
+      } else {
+        pickedFile = await picker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: imageQuality,
+        );
+      }
 
       if (pickedFile == null) return null;
 
       return File(pickedFile.path);
     } catch (e) {
       // Handle or log potential platform exceptions
-      debugPrint('Error picking image from camera: $e');
+      debugPrint('Error picking media from camera: $e');
       return null;
     }
+  }
+
+  /// Formats byte size into human readable format (e.g. 1.5 MB).
+  static String formatBytes(int bytes, [int decimals = 2]) {
+    if (bytes <= 0) return "0 B";
+    const suffixes = ["B", "KB", "MB", "GB", "TB"];
+    var i = (math.log(bytes) / math.log(1024)).floor();
+    return '${(bytes / math.pow(1024, i)).toStringAsFixed(decimals)} ${suffixes[i]}';
   }
 
   /// Processes the selected media items from the gallery.
@@ -79,27 +93,41 @@ class InAppGalleryUtils {
           continue;
         }
 
+        final originalBytes = await file.length();
+
         // -----------------------
         // HANDLE VIDEOS
         // -----------------------
         if (asset.type == AssetType.video) {
           if (!allowVideoCompression) {
+            debugPrint(
+              'Video Processed (Uncompressed): ${asset.title ?? file.path} | '
+              'Size: ${formatBytes(originalBytes)}',
+            );
             finalFiles.add(file);
+            currentFileIndex++;
             continue; // Move to the next asset
           }
 
-          final originalBytes = await file.length();
           if (originalBytes > maxVideoSizeBytes) {
             final filename = asset.title ?? 'Unknown Video';
 
             if (onVideoSizeExceeded != null) {
               onVideoSizeExceeded(filename);
             }
+            currentFileIndex++;
             continue; // Skip compressing and adding this file
           }
 
           final compressedVideo = await compressVideo(file);
+          final compressedBytes = await compressedVideo.length();
+          debugPrint(
+            'Video Processed (Compressed): ${asset.title ?? file.path} | '
+            'Original Size: ${formatBytes(originalBytes)} -> '
+            'Compressed Size: ${formatBytes(compressedBytes)}',
+          );
           finalFiles.add(compressedVideo);
+          currentFileIndex++;
           continue;
         }
 
@@ -107,11 +135,21 @@ class InAppGalleryUtils {
         // HANDLE IMAGES
         // -----------------------
         if (imageQuality == null) {
+          debugPrint(
+            'Image Processed (Uncompressed): ${asset.title ?? file.path} | '
+            'Size: ${formatBytes(originalBytes)}',
+          );
           finalFiles.add(file);
         } else {
           final compressedImage = await compressImage(
             file,
             quality: imageQuality,
+          );
+          final compressedBytes = await compressedImage.length();
+          debugPrint(
+            'Image Processed (Compressed): ${asset.title ?? file.path} | '
+            'Original Size: ${formatBytes(originalBytes)} -> '
+            'Compressed Size: ${formatBytes(compressedBytes)}',
           );
           finalFiles.add(compressedImage);
         }

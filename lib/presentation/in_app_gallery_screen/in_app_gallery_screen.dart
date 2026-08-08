@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:media_kit/media_kit.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../../logic/cubit/in_app_gallery_cubit.dart';
@@ -46,9 +45,6 @@ class InAppGalleryScreen extends StatefulWidget {
 
   /// Custom widget to display when gallery or camera permissions are denied.
   final Widget? permissionDeniedWidget;
-
-  /// Custom widget to display when there are no media files found on the device.
-  final Widget? noMediaWidget;
 
   /// Custom compression dialog widget shown while videos/images are being processed.
   /// Receives the build context and a stream of the compression progress (0.0 to 1.0).
@@ -96,7 +92,6 @@ class InAppGalleryScreen extends StatefulWidget {
     this.cameraWidget,
     this.selectionCheckboxWidget,
     this.permissionDeniedWidget,
-    this.noMediaWidget,
     this.compressionDialogWidget,
     this.imageQuality,
     this.maxSelection,
@@ -132,7 +127,6 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
   @override
   void initState() {
     super.initState();
-    MediaKit.ensureInitialized();
     WidgetsBinding.instance.addObserver(this);
     PhotoManager.setIgnorePermissionCheck(true);
     _cubit = InAppGalleryCubit();
@@ -337,7 +331,6 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
                                           selectionCheckboxWidget:
                                               widget.selectionCheckboxWidget,
                                           cameraWidget: widget.cameraWidget,
-                                          noMediaWidget: widget.noMediaWidget,
                                         );
                                       } else {
                                         return InAppGalleryGrid(
@@ -349,7 +342,7 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
                                           isImagesTab: false,
                                           selectionCheckboxWidget:
                                               widget.selectionCheckboxWidget,
-                                          noMediaWidget: widget.noMediaWidget,
+                                          cameraWidget: widget.cameraWidget,
                                         );
                                       }
                                     }
@@ -367,7 +360,6 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
                                           selectionCheckboxWidget:
                                               widget.selectionCheckboxWidget,
                                           cameraWidget: widget.cameraWidget,
-                                          noMediaWidget: widget.noMediaWidget,
                                         ),
                                         InAppGalleryGrid(
                                           mediaList: state.galleryVideos,
@@ -378,7 +370,7 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
                                           isImagesTab: false,
                                           selectionCheckboxWidget:
                                               widget.selectionCheckboxWidget,
-                                          noMediaWidget: widget.noMediaWidget,
+                                          cameraWidget: widget.cameraWidget,
                                         ),
                                       ],
                                     );

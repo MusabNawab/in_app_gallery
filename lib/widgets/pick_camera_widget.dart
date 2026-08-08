@@ -11,11 +11,13 @@ class PickCameraWidget extends StatelessWidget {
     required this.pickedImage,
     this.imageQuality,
     this.cameraWidget,
+    this.isVideo = false,
   });
 
   final ValueChanged<File?> pickedImage;
   final int? imageQuality;
   final Widget? cameraWidget;
+  final bool isVideo;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +28,7 @@ class PickCameraWidget extends StatelessWidget {
         final result = await InAppGalleryUtils.onCameraPicked(
           context: context,
           imageQuality: imageQuality,
+          isVideo: isVideo,
         );
         pickedImage(result);
       },

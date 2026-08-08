@@ -11,78 +11,121 @@ part 'in_app_gallery_state.dart';
 class InAppGalleryCubit extends Cubit<InAppGalleryState> {
   InAppGalleryCubit() : super(InAppGalleryState.initial());
 
+  bool _isLoadingMoreImages = false;
+  bool _isLoadingMoreVideos = false;
+
   void reset() {
+    _isLoadingMoreImages = false;
+    _isLoadingMoreVideos = false;
     emit(InAppGalleryState.initial());
   }
 
   /// Fetches a paginated list of images from the device gallery.
   Future<void> getImages({bool loadMore = false}) async {
-    if (loadMore && !state.hasMoreImages) return;
-
-    if (!loadMore) {
+    if (loadMore) {
+      if (!state.hasMoreImages || _isLoadingMoreImages) return;
+      _isLoadingMoreImages = true;
+    } else {
       emit(state.copyWith(isLoading: true));
     }
 
-    final page = loadMore ? state.imagePage + 1 : 0;
+    try {
+      final page = loadMore ? state.imagePage + 1 : 0;
+      const pageSize = 80;
 
-    final assetCount = await PhotoManager.getAssetCount(
-      type: RequestType.image,
-    );
-    final entities = await PhotoManager.getAssetListPaged(
-      page: page,
-      pageCount: 80,
-      type: RequestType.image,
-    );
+      final assetCount = await PhotoManager.getAssetCount(
+        type: RequestType.image,
+      );
+      final entities = await PhotoManager.getAssetListPaged(
+        page: page,
+        pageCount: pageSize,
+        type: RequestType.image,
+      );
 
-    final newImages = loadMore
-        ? [...state.galleryImages, ...entities]
-        : entities;
-    final hasMore = newImages.length < assetCount;
+      final existingImages = loadMore ? state.galleryImages : <AssetEntity>[];
+      final existingIds = existingImages.map((e) => e.id).toSet();
 
-    emit(
-      state.copyWith(
-        imageAssetCount: assetCount,
-        galleryImages: newImages,
-        imagePage: page,
-        hasMoreImages: hasMore,
-        isLoading: false,
-      ),
-    );
+      final uniqueNewEntities = entities
+          .where((e) => !existingIds.contains(e.id))
+          .toList();
+      final updatedImages = [...existingImages, ...uniqueNewEntities];
+
+      final hasMore =
+          entities.isNotEmpty &&
+          (entities.length == pageSize) &&
+          (updatedImages.length < assetCount);
+
+      emit(
+        state.copyWith(
+          imageAssetCount: assetCount,
+          galleryImages: updatedImages,
+          imagePage: page,
+          hasMoreImages: hasMore,
+          isLoading: false,
+        ),
+      );
+    } catch (e) {
+      emit(state.copyWith(isLoading: false));
+    } finally {
+      if (loadMore) {
+        _isLoadingMoreImages = false;
+      }
+    }
   }
 
   /// Fetches a paginated list of videos from the device gallery.
   Future<void> getVideos({bool loadMore = false}) async {
-    if (loadMore && !state.hasMoreVideos) return;
-
-    if (!loadMore && state.galleryVideos.isEmpty) {
-      emit(state.copyWith(isLoading: true));
+    if (loadMore) {
+      if (!state.hasMoreVideos || _isLoadingMoreVideos) return;
+      _isLoadingMoreVideos = true;
+    } else {
+      if (state.galleryVideos.isEmpty) {
+        emit(state.copyWith(isLoading: true));
+      }
     }
 
-    final page = loadMore ? state.videoPage + 1 : 0;
+    try {
+      final page = loadMore ? state.videoPage + 1 : 0;
+      const pageSize = 80;
 
-    final assetCount = await PhotoManager.getAssetCount(
-      type: RequestType.video,
-    );
-    final entities = await PhotoManager.getAssetListPaged(
-      page: page,
-      pageCount: 80,
-      type: RequestType.video,
-    );
+      final assetCount = await PhotoManager.getAssetCount(
+        type: RequestType.video,
+      );
+      final entities = await PhotoManager.getAssetListPaged(
+        page: page,
+        pageCount: pageSize,
+        type: RequestType.video,
+      );
 
-    final newVideos = loadMore
-        ? [...state.galleryVideos, ...entities]
-        : entities;
-    final hasMore = newVideos.length < assetCount;
+      final existingVideos = loadMore ? state.galleryVideos : <AssetEntity>[];
+      final existingIds = existingVideos.map((e) => e.id).toSet();
 
-    emit(
-      state.copyWith(
-        videoAssetCount: assetCount,
-        galleryVideos: newVideos,
-        videoPage: page,
-        hasMoreVideos: hasMore,
-        isLoading: false,
-      ),
-    );
+      final uniqueNewEntities = entities
+          .where((e) => !existingIds.contains(e.id))
+          .toList();
+      final updatedVideos = [...existingVideos, ...uniqueNewEntities];
+
+      final hasMore =
+          entities.isNotEmpty &&
+          (entities.length == pageSize) &&
+          (updatedVideos.length < assetCount);
+
+      emit(
+        state.copyWith(
+          videoAssetCount: assetCount,
+          galleryVideos: updatedVideos,
+          videoPage: page,
+          hasMoreVideos: hasMore,
+          isLoading: false,
+        ),
+      );
+    } catch (e) {
+      emit(state.copyWith(isLoading: false));
+    } finally {
+      if (loadMore) {
+        _isLoadingMoreVideos = false;
+      }
+    }
   }
 
   /// Toggles the selection state of a media file.
@@ -93,35 +136,64 @@ class InAppGalleryCubit extends Cubit<InAppGalleryState> {
     if (updatedSelection.contains(file)) {
       updatedSelection.remove(file);
     } else {
-      if (maxSelection != null && updatedSelection.length >= maxSelection) {
+      if (maxSelection == 1) {
+        updatedSelection.clear();
+        updatedSelection.add(file);
+      } else if (maxSelection != null &&
+          updatedSelection.length >= maxSelection) {
         // Can't select more than maxSelection
         return;
+      } else {
+        updatedSelection.add(file);
       }
-      updatedSelection.add(file);
     }
 
     emit(state.copyWith(selectedMedia: updatedSelection));
   }
 
-  /// Saves a newly taken photo from the camera to the gallery and selects it.
-  void onCameraSelect(BuildContext context, File file) async {
+  /// Saves a newly taken photo or video from the camera to the gallery and selects it.
+  void onCameraSelect(
+    BuildContext context,
+    File file, {
+    bool isVideo = false,
+    int? maxSelection,
+  }) async {
     try {
-      final newEntity = await PhotoManager.editor.saveImageWithPath(
-        file.path,
-        title: file.path.split('/').last,
-      );
+      final title = file.path.split('/').last;
+      final newEntity = isVideo
+          ? await PhotoManager.editor.saveVideo(file, title: title)
+          : await PhotoManager.editor.saveImageWithPath(
+              file.path,
+              title: title,
+            );
 
-      final updatedGallery = List<AssetEntity>.from(state.galleryImages);
+      final updatedGallery = List<AssetEntity>.from(
+        isVideo ? state.galleryVideos : state.galleryImages,
+      );
       final updatedSelection = List<AssetEntity>.from(state.selectedMedia);
 
       updatedGallery.insert(0, newEntity);
-      updatedSelection.add(newEntity);
+
+      if (maxSelection == 1) {
+        updatedSelection.clear();
+        updatedSelection.add(newEntity);
+      } else if (maxSelection != null &&
+          updatedSelection.length >= maxSelection) {
+        // Limit reached, do not auto-add to selection
+      } else {
+        updatedSelection.add(newEntity);
+      }
 
       emit(
-        state.copyWith(
-          galleryImages: updatedGallery,
-          selectedMedia: updatedSelection,
-        ),
+        isVideo
+            ? state.copyWith(
+                galleryVideos: updatedGallery,
+                selectedMedia: updatedSelection,
+              )
+            : state.copyWith(
+                galleryImages: updatedGallery,
+                selectedMedia: updatedSelection,
+              ),
       );
     } catch (e) {
       // Handle error gracefully

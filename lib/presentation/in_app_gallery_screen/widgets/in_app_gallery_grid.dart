@@ -5,7 +5,6 @@ import 'package:photo_manager/photo_manager.dart';
 import '../../../logic/cubit/in_app_gallery_cubit.dart';
 import '../../../widgets/media_thumbnail.dart';
 import '../../../widgets/pick_camera_widget.dart';
-import 'no_media_widget.dart';
 
 class InAppGalleryGrid extends StatelessWidget {
   const InAppGalleryGrid({
@@ -14,7 +13,6 @@ class InAppGalleryGrid extends StatelessWidget {
     required this.mediaList,
     required this.selectedMedia,
     required this.isImagesTab,
-    this.noMediaWidget,
     this.imageQuality,
     required this.maxSelection,
     this.selectionCheckboxWidget,
@@ -28,16 +26,12 @@ class InAppGalleryGrid extends StatelessWidget {
   final int? maxSelection;
   final Widget? selectionCheckboxWidget;
   final Widget? cameraWidget;
-  final Widget? noMediaWidget;
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<InAppGalleryCubit>();
-    final itemCount = isImagesTab ? mediaList.length + 1 : mediaList.length;
+    final itemCount = mediaList.length + 1;
 
-    if (itemCount == (isImagesTab ? 1 : 0)) {
-      return noMediaWidget ?? NoMediaWidget();
-    }
     return RefreshIndicator(
       onRefresh: () async {
         cubit.reset();
@@ -53,19 +47,25 @@ class InAppGalleryGrid extends StatelessWidget {
           mainAxisSpacing: 1.25,
         ),
         itemBuilder: (context, index) {
-          if (isImagesTab && index == 0) {
+          if (index == 0) {
             return PickCameraWidget(
               imageQuality: imageQuality,
               cameraWidget: cameraWidget,
+              isVideo: !isImagesTab,
               pickedImage: (image) {
                 if (image != null) {
-                  cubit.onCameraSelect(context, image);
+                  cubit.onCameraSelect(
+                    context,
+                    image,
+                    isVideo: !isImagesTab,
+                    maxSelection: maxSelection,
+                  );
                 }
               },
             );
           }
 
-          final mediaIndex = isImagesTab ? index - 1 : index;
+          final mediaIndex = index - 1;
           final media = mediaList[mediaIndex];
           final isSelected = selectedMedia.contains(media);
 

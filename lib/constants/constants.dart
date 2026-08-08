@@ -21,11 +21,6 @@ class Constants {
   static const String galleryAccessRequiredSubtitle =
       "To select and upload photos, please allow access to your device's gallery in the app settings.";
 
-  // No Media Widget
-  static const String noMediaFound = "No Media Found";
-  static const String noMediaFoundSubtitle =
-      "You haven't captured any media yet.";
-
   // Pick Camera Widget
   static const String camera = "Camera";
 

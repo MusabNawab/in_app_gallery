@@ -28,7 +28,7 @@ This package is built using several robust packages to provide a seamless experi
 * **[flutter_bloc](https://pub.dev/packages/flutter_bloc)**: For predictable state management.
 * **[flutter_image_compress](https://pub.dev/packages/flutter_image_compress)**: For high-quality image compression.
 * **[hw_video_compress](https://pub.dev/packages/hw_video_compress)**: For hardware-accelerated, native video compression.
-* **[media_kit](https://pub.dev/packages/media_kit)**: For reliable video playback within the selection grid.
+* **[video_player](https://pub.dev/packages/video_player)**: For reliable video playback within the selection grid.
 * **[permission_handler](https://pub.dev/packages/permission_handler)**: For requesting device permissions.
 
 ### Video Compression
@@ -107,7 +107,6 @@ Future<void> _openGallery() async {
 | `allowVideoCompression` | `bool` | `false` | Enable/disable compressing videos before returning them. |
 | `imageQuality` | `int?` | `null` | Target compression quality (0-100) for picked images. |
 | `cameraWidget` | `Widget?` | `null` | Custom builder to override the look of the camera option. |
-| `noMediaWidget` | `Widget?` | `null` | Custom widget to show when no media files are found. |
 | `permissionDeniedWidget` | `Widget?` | `null` | Custom widget to display when permissions are denied. |
 | `compressionDialogWidget` | `Widget Function(BuildContext, Stream<double>)?` | `null` | Custom progress dialog shown during media processing. |
 
