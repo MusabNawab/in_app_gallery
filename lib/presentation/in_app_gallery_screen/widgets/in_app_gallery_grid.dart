@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -5,6 +7,7 @@ import 'package:photo_manager/photo_manager.dart';
 import '../../../logic/cubit/in_app_gallery_cubit.dart';
 import '../../../widgets/media_thumbnail.dart';
 import '../../../widgets/pick_camera_widget.dart';
+import '../../photo_editor/photo_editor_screen.dart';
 
 class InAppGalleryGrid extends StatelessWidget {
   const InAppGalleryGrid({
@@ -17,6 +20,10 @@ class InAppGalleryGrid extends StatelessWidget {
     required this.maxSelection,
     this.selectionCheckboxWidget,
     this.cameraWidget,
+    this.editedFiles = const {},
+    this.enablePhotoEdit = true,
+    this.editButtonBuilder,
+    this.customPhotoEditor,
   });
   final ScrollController controller;
   final List<AssetEntity> mediaList;
@@ -26,6 +33,20 @@ class InAppGalleryGrid extends StatelessWidget {
   final int? maxSelection;
   final Widget? selectionCheckboxWidget;
   final Widget? cameraWidget;
+  final Map<String, File> editedFiles;
+  final bool enablePhotoEdit;
+  final Widget Function(
+    BuildContext context,
+    AssetEntity asset,
+    VoidCallback onEdit,
+  )?
+  editButtonBuilder;
+  final Future<File?> Function(
+    BuildContext context,
+    File originalFile,
+    AssetEntity asset,
+  )?
+  customPhotoEditor;
 
   @override
   Widget build(BuildContext context) {
@@ -68,11 +89,37 @@ class InAppGalleryGrid extends StatelessWidget {
           final mediaIndex = index - 1;
           final media = mediaList[mediaIndex];
           final isSelected = selectedMedia.contains(media);
+          final editedFile = editedFiles[media.id];
 
           return MediaThumbnail(
             asset: media,
             isSelected: isSelected,
             selectionCheckboxWidget: selectionCheckboxWidget,
+            editedFile: editedFile,
+            enablePhotoEdit: enablePhotoEdit,
+            editButtonBuilder: editButtonBuilder,
+            onEdit: () async {
+              final file = editedFile ?? await media.file;
+              if (file == null) return;
+              if (!context.mounted) return;
+
+              final File? result;
+              if (customPhotoEditor != null) {
+                result = await customPhotoEditor!(context, file, media);
+              } else {
+                result = await PhotoEditorScreen.open(
+                  context: context,
+                  file: file,
+                  asset: media,
+                  initialQuality: imageQuality,
+                  theme: Theme.of(context),
+                );
+              }
+
+              if (result != null) {
+                cubit.setEditedFile(media, result, maxSelection: maxSelection);
+              }
+            },
             onSelected: () {
               cubit.onMediaSelect(media, maxSelection: maxSelection);
             },

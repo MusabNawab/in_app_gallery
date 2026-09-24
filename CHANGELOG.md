@@ -1,3 +1,16 @@
+## 1.1.0
+
+* **In-App Photo Editor Suite**:
+  * Integrated `flutter_bicubic_resize: ^1.9.0` for high-performance native C image resizing and compression.
+  * Added on-selection photo editing: selecting a photo displays an intuitive Edit action directly on the media thumbnail, in the preview modal, and in the app bar.
+  * **Freeform & Preset Crop**: Freeform custom crop with draggable handles and live rule-of-thirds grid, plus presets for 1:1, 4:3, 16:9, 9:16, 3:2, 2:3, and custom user-defined aspect ratios.
+  * **Rotation & Flip**: 90° clockwise rotation and horizontal flipping with dynamic aspect ratio recalculation.
+  * **Resolution & Quality Controls**: Target resolution downscale limits (Full Res, 1920px FHD, 1080px HD, 720px, 512px) and JPEG quality slider (10-100).
+  * **Bicubic Interpolation Filters**: Native C Catmull-Rom, Mitchell-Netravali, and Cubic B-Spline interpolation algorithms.
+  * Extracted photo editor UI into dedicated, modular widgets in `lib/presentation/photo_editor/widgets/`.
+* **Gallery Customizations**:
+  * Added `enablePhotoEdit`, `editButtonBuilder`, and `customPhotoEditor` configuration parameters to `InAppGalleryScreen`.
+
 ## 1.0.4
 
 * **Camera Option & Layout Improvements**: 

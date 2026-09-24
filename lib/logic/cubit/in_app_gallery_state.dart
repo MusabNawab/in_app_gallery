@@ -41,6 +41,9 @@ class InAppGalleryState {
   /// Total number of files being processed.
   final int processingTotal;
 
+  /// Map of asset IDs to edited image files.
+  final Map<String, File> editedFiles;
+
   InAppGalleryState({
     required this.imageAssetCount,
     required this.videoAssetCount,
@@ -55,6 +58,7 @@ class InAppGalleryState {
     required this.isProcessing,
     required this.processingCurrent,
     required this.processingTotal,
+    this.editedFiles = const {},
   });
 
   /// Factory constructor for the initial empty state.
@@ -73,6 +77,7 @@ class InAppGalleryState {
       isProcessing: false,
       processingCurrent: 0,
       processingTotal: 0,
+      editedFiles: const {},
     );
   }
 
@@ -90,6 +95,7 @@ class InAppGalleryState {
     bool? isProcessing,
     int? processingCurrent,
     int? processingTotal,
+    Map<String, File>? editedFiles,
   }) {
     return InAppGalleryState(
       imageAssetCount: imageAssetCount ?? this.imageAssetCount,
@@ -105,6 +111,7 @@ class InAppGalleryState {
       isProcessing: isProcessing ?? this.isProcessing,
       processingCurrent: processingCurrent ?? this.processingCurrent,
       processingTotal: processingTotal ?? this.processingTotal,
+      editedFiles: editedFiles ?? this.editedFiles,
     );
   }
 }

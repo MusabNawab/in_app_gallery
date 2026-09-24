@@ -1,8 +1,10 @@
 import 'dart:developer';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bicubic_resize/flutter_bicubic_resize.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:hw_video_compress/hw_video_compress.dart';
 import 'package:image_picker/image_picker.dart';
@@ -68,10 +70,12 @@ class InAppGalleryUtils {
 
   /// Processes the selected media items from the gallery.
   /// Applies image and video compression if configured.
+  /// Uses [editedFiles] when available for customized photos.
   /// Returns a list of processed [File]s ready for upload.
   static Future<List<File>> onSelectionCompleted({
     int? imageQuality,
     required List<AssetEntity> selectedMedia,
+    Map<String, File>? editedFiles,
     required bool allowVideoCompression,
     void Function(String filename)? onVideoSizeExceeded,
     void Function(int current, int total)? onProgress,
@@ -87,7 +91,9 @@ class InAppGalleryUtils {
           onProgress(currentFileIndex, totalFiles);
         }
 
-        final file = await asset.file;
+        final bool hasEditedFile =
+            editedFiles != null && editedFiles.containsKey(asset.id);
+        final file = hasEditedFile ? editedFiles[asset.id]! : await asset.file;
         if (file == null) {
           currentFileIndex++;
           continue;
@@ -134,7 +140,13 @@ class InAppGalleryUtils {
         // -----------------------
         // HANDLE IMAGES
         // -----------------------
-        if (imageQuality == null) {
+        if (hasEditedFile) {
+          debugPrint(
+            'Image Processed (User Edited): ${asset.title ?? file.path} | '
+            'Size: ${formatBytes(originalBytes)}',
+          );
+          finalFiles.add(file);
+        } else if (imageQuality == null) {
           debugPrint(
             'Image Processed (Uncompressed): ${asset.title ?? file.path} | '
             'Size: ${formatBytes(originalBytes)}',
@@ -170,13 +182,56 @@ class InAppGalleryUtils {
   }
 
   /// Compresses an image and returns the compressed file.
+  /// Uses native C bicubic compression via [BicubicResizer] when possible,
+  /// with automatic fallback to [FlutterImageCompress].
   static Future<File> compressImage(File file, {int quality = 50}) async {
     try {
       final dir = await getTemporaryDirectory();
       final ext = file.path.toLowerCase().endsWith('.png') ? '.png' : '.jpg';
-      final format = ext == '.png' ? CompressFormat.png : CompressFormat.jpeg;
       final targetPath = '${dir.path}/${const Uuid().v4()}_compressed$ext';
 
+      // 1. Attempt high-performance Bicubic native C resize/compression
+      try {
+        final bytes = await file.readAsBytes();
+        final info = BicubicResizer.getImageInfo(bytes);
+        final srcW = info.orientedWidth > 0 ? info.orientedWidth : info.width;
+        final srcH =
+            info.orientedHeight > 0 ? info.orientedHeight : info.height;
+
+        if (srcW > 0 && srcH > 0) {
+          final targetDims = BicubicResizer.computeFitDimensions(
+            sourceWidth: srcW,
+            sourceHeight: srcH,
+            maxWidth: 1024,
+            maxHeight: 1024,
+          );
+
+          final Uint8List compressedBytes;
+          if (info.format == ImageFormat.png) {
+            compressedBytes = await BicubicResizer.resizePngAsync(
+              pngBytes: bytes,
+              outputWidth: targetDims.width,
+              outputHeight: targetDims.height,
+            );
+          } else {
+            compressedBytes = await BicubicResizer.resizeJpegAsync(
+              jpegBytes: bytes,
+              outputWidth: targetDims.width,
+              outputHeight: targetDims.height,
+              quality: quality,
+            );
+          }
+
+          final compressedFile = File(targetPath);
+          await compressedFile.writeAsBytes(compressedBytes);
+          return compressedFile;
+        }
+      } catch (e) {
+        log('Bicubic compress fallback: $e');
+      }
+
+      // 2. Fallback to FlutterImageCompress
+      final format = ext == '.png' ? CompressFormat.png : CompressFormat.jpeg;
       final result = await FlutterImageCompress.compressAndGetFile(
         file.absolute.path,
         targetPath,
@@ -193,6 +248,73 @@ class InAppGalleryUtils {
       log('Error compressing image: $e');
     }
     return file;
+  }
+
+  /// Resizes and crops an image file using [BicubicResizer] with native C performance.
+  static Future<File> resizeAndCompressWithBicubic({
+    required File inputFile,
+    int? outputWidth,
+    int? outputHeight,
+    int? maxWidth,
+    int? maxHeight,
+    int quality = 90,
+    int compressionLevel = 6,
+    BicubicFilter filter = BicubicFilter.catmullRom,
+    EdgeMode edgeMode = EdgeMode.clamp,
+    double crop = 1.0,
+    CropAnchor cropAnchor = CropAnchor.center,
+    CropAspectRatio cropAspectRatio = CropAspectRatio.original,
+    double aspectRatioWidth = 1.0,
+    double aspectRatioHeight = 1.0,
+    bool applyExifOrientation = true,
+  }) async {
+    final dir = await getTemporaryDirectory();
+    final ext = inputFile.path.toLowerCase().endsWith('.png') ? '.png' : '.jpg';
+    final targetPath = '${dir.path}/${const Uuid().v4()}_bicubic$ext';
+
+    int targetW = outputWidth ?? 0;
+    int targetH = outputHeight ?? 0;
+
+    if (targetW <= 0 || targetH <= 0) {
+      final bytes = await inputFile.readAsBytes();
+      final info = BicubicResizer.getImageInfo(bytes);
+      final srcW = info.orientedWidth > 0 ? info.orientedWidth : info.width;
+      final srcH =
+          info.orientedHeight > 0 ? info.orientedHeight : info.height;
+
+      if (maxWidth != null || maxHeight != null) {
+        final dims = BicubicResizer.computeFitDimensions(
+          sourceWidth: srcW,
+          sourceHeight: srcH,
+          maxWidth: maxWidth ?? srcW,
+          maxHeight: maxHeight ?? srcH,
+        );
+        targetW = dims.width;
+        targetH = dims.height;
+      } else {
+        targetW = srcW;
+        targetH = srcH;
+      }
+    }
+
+    await BicubicResizer.resizeFileToFileAsync(
+      inputPath: inputFile.path,
+      outputPath: targetPath,
+      outputWidth: targetW,
+      outputHeight: targetH,
+      quality: quality,
+      compressionLevel: compressionLevel,
+      filter: filter,
+      edgeMode: edgeMode,
+      crop: crop,
+      cropAnchor: cropAnchor,
+      cropAspectRatio: cropAspectRatio,
+      aspectRatioWidth: aspectRatioWidth,
+      aspectRatioHeight: aspectRatioHeight,
+      applyExifOrientation: applyExifOrientation,
+    );
+
+    return File(targetPath);
   }
 
   /// Compresses a video using the native platform implementation via MethodChannel.

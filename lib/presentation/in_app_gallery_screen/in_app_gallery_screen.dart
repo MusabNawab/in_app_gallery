@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -8,6 +10,7 @@ import '../../utils/in_app_gallery_utils.dart';
 import '../../utils/permission_access_utils.dart';
 import '../../constants/constants.dart';
 import '../../widgets/media_loading_skeleton.dart';
+import '../photo_editor/photo_editor_screen.dart';
 import 'widgets/default_compression_dialog.dart';
 import 'widgets/in_app_gallery_appbar.dart';
 import 'widgets/in_app_gallery_grid.dart';
@@ -83,6 +86,26 @@ class InAppGalleryScreen extends StatefulWidget {
   /// Custom text for the Videos tab. Default is 'Videos'.
   final String videosTabText;
 
+  /// Whether to enable editing for selected photos. Default is true.
+  final bool enablePhotoEdit;
+
+  /// Custom builder for the edit button on selected photo thumbnails.
+  final Widget Function(
+    BuildContext context,
+    AssetEntity asset,
+    VoidCallback onEdit,
+  )?
+  editButtonBuilder;
+
+  /// Optional custom photo editor callback. If null, the built-in
+  /// [PhotoEditorScreen] powered by flutter_bicubic_resize is used.
+  final Future<File?> Function(
+    BuildContext context,
+    File originalFile,
+    AssetEntity asset,
+  )?
+  customPhotoEditor;
+
   const InAppGalleryScreen({
     super.key,
     this.allowVideoCompression = false,
@@ -103,6 +126,9 @@ class InAppGalleryScreen extends StatefulWidget {
     this.title = 'Gallery',
     this.imagesTabText = 'Images',
     this.videosTabText = 'Videos',
+    this.enablePhotoEdit = true,
+    this.editButtonBuilder,
+    this.customPhotoEditor,
   });
 
   @override
@@ -196,6 +222,7 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
       final files = await InAppGalleryUtils.onSelectionCompleted(
         imageQuality: widget.imageQuality,
         selectedMedia: _cubit.state.selectedMedia,
+        editedFiles: _cubit.state.editedFiles,
         allowVideoCompression: widget.allowVideoCompression,
         onVideoSizeExceeded: (filename) {
           if (widget.onVideoSizeExceeded != null) {
@@ -282,6 +309,39 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
           },
           builder: (context, state) {
             final fileCount = state.selectedMedia.length;
+
+            VoidCallback? onAppBarEdit;
+            if (widget.enablePhotoEdit &&
+                fileCount == 1 &&
+                state.selectedMedia.first.type == AssetType.image) {
+              final singleAsset = state.selectedMedia.first;
+              onAppBarEdit = () async {
+                final file = state.editedFiles[singleAsset.id] ??
+                    await singleAsset.file;
+                if (file == null || !context.mounted) return;
+                final result = widget.customPhotoEditor != null
+                    ? await widget.customPhotoEditor!(
+                        context,
+                        file,
+                        singleAsset,
+                      )
+                    : await PhotoEditorScreen.open(
+                        context: context,
+                        file: file,
+                        asset: singleAsset,
+                        initialQuality: widget.imageQuality,
+                        theme: Theme.of(context),
+                      );
+                if (result != null) {
+                  _cubit.setEditedFile(
+                    singleAsset,
+                    result,
+                    maxSelection: widget.maxSelection,
+                  );
+                }
+              };
+            }
+
             return Scaffold(
               appBar: widget.appBar != null
                   ? widget.appBar!(fileCount, _onSelectionComplete)
@@ -289,6 +349,7 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
                       title: widget.title,
                       fileCount: fileCount,
                       onDone: _onSelectionComplete,
+                      onEdit: onAppBarEdit,
                     ),
               body: SafeArea(
                 child: _isCheckingPermission
@@ -331,6 +392,13 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
                                           selectionCheckboxWidget:
                                               widget.selectionCheckboxWidget,
                                           cameraWidget: widget.cameraWidget,
+                                          editedFiles: state.editedFiles,
+                                          enablePhotoEdit:
+                                              widget.enablePhotoEdit,
+                                          editButtonBuilder:
+                                              widget.editButtonBuilder,
+                                          customPhotoEditor:
+                                              widget.customPhotoEditor,
                                         );
                                       } else {
                                         return InAppGalleryGrid(
@@ -343,6 +411,13 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
                                           selectionCheckboxWidget:
                                               widget.selectionCheckboxWidget,
                                           cameraWidget: widget.cameraWidget,
+                                          editedFiles: state.editedFiles,
+                                          enablePhotoEdit:
+                                              widget.enablePhotoEdit,
+                                          editButtonBuilder:
+                                              widget.editButtonBuilder,
+                                          customPhotoEditor:
+                                              widget.customPhotoEditor,
                                         );
                                       }
                                     }
@@ -360,6 +435,13 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
                                           selectionCheckboxWidget:
                                               widget.selectionCheckboxWidget,
                                           cameraWidget: widget.cameraWidget,
+                                          editedFiles: state.editedFiles,
+                                          enablePhotoEdit:
+                                              widget.enablePhotoEdit,
+                                          editButtonBuilder:
+                                              widget.editButtonBuilder,
+                                          customPhotoEditor:
+                                              widget.customPhotoEditor,
                                         ),
                                         InAppGalleryGrid(
                                           mediaList: state.galleryVideos,
@@ -371,6 +453,13 @@ class _InAppGalleryScreenState extends State<InAppGalleryScreen>
                                           selectionCheckboxWidget:
                                               widget.selectionCheckboxWidget,
                                           cameraWidget: widget.cameraWidget,
+                                          editedFiles: state.editedFiles,
+                                          enablePhotoEdit:
+                                              widget.enablePhotoEdit,
+                                          editButtonBuilder:
+                                              widget.editButtonBuilder,
+                                          customPhotoEditor:
+                                              widget.customPhotoEditor,
                                         ),
                                       ],
                                     );

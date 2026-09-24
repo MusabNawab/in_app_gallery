@@ -11,6 +11,7 @@ class MediaContainer extends StatelessWidget {
     this.onLongPress,
     required this.pickedImage,
     this.selectionCheckboxWidget,
+    this.editWidget,
   });
 
   final Widget image;
@@ -19,6 +20,7 @@ class MediaContainer extends StatelessWidget {
   final VoidCallback pickedImage;
   final VoidCallback? onLongPress;
   final Widget? selectionCheckboxWidget;
+  final Widget? editWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +31,7 @@ class MediaContainer extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           image,
+          ?editWidget,
           if (showCheckbox)
             selectionCheckboxWidget ??
                 Positioned(

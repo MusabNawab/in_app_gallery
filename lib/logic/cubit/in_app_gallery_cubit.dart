@@ -200,6 +200,40 @@ class InAppGalleryCubit extends Cubit<InAppGalleryState> {
     }
   }
 
+  /// Sets an edited file override for a specific [AssetEntity].
+  /// Automatically ensures the asset is selected.
+  void setEditedFile(AssetEntity file, File editedFile, {int? maxSelection}) {
+    final updatedEditedFiles = Map<String, File>.from(state.editedFiles);
+    updatedEditedFiles[file.id] = editedFile;
+
+    final updatedSelection = List<AssetEntity>.from(state.selectedMedia);
+    if (!updatedSelection.contains(file)) {
+      if (maxSelection == 1) {
+        updatedSelection.clear();
+        updatedSelection.add(file);
+      } else if (maxSelection != null &&
+          updatedSelection.length >= maxSelection) {
+        // Can't exceed max selection
+      } else {
+        updatedSelection.add(file);
+      }
+    }
+
+    emit(
+      state.copyWith(
+        editedFiles: updatedEditedFiles,
+        selectedMedia: updatedSelection,
+      ),
+    );
+  }
+
+  /// Removes an edited file override for a specific [AssetEntity].
+  void removeEditedFile(AssetEntity file) {
+    final updatedEditedFiles = Map<String, File>.from(state.editedFiles);
+    updatedEditedFiles.remove(file.id);
+    emit(state.copyWith(editedFiles: updatedEditedFiles));
+  }
+
   /// Sets the processing state when compressing and finalizing selected media.
   void setProcessing(
     bool isProcessing, {

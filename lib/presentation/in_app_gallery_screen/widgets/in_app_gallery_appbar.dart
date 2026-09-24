@@ -9,11 +9,13 @@ class InAppGalleryAppBar extends StatelessWidget
     required this.title,
     required this.fileCount,
     required this.onDone,
+    this.onEdit,
   });
 
   final String title;
   final int fileCount;
   final VoidCallback onDone;
+  final VoidCallback? onEdit;
   @override
   Size get preferredSize => Size.fromHeight(kToolbarHeight);
 
@@ -28,9 +30,18 @@ class InAppGalleryAppBar extends StatelessWidget
         },
       ),
       actions: [
-        if (fileCount == 0) const SizedBox.shrink(),
+        if (onEdit != null)
+          IconButton(
+            icon: const Icon(Icons.tune_rounded),
+            tooltip: 'Edit Selected Photo',
+            onPressed: onEdit,
+          ),
         if (fileCount > 0)
-          IconButton(icon: const Icon(Icons.check), onPressed: onDone),
+          IconButton(
+            icon: const Icon(Icons.check),
+            tooltip: 'Done',
+            onPressed: onDone,
+          ),
       ],
     );
   }

@@ -31,15 +31,17 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   List<File> _selectedMedia = [];
+  bool _enablePhotoEdit = true;
 
   Future<void> _openGallery() async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const InAppGalleryScreen(
+        builder: (context) => InAppGalleryScreen(
           title: 'Select Media',
           maxSelection: 10,
           allowVideoCompression: true,
           imageQuality: 70,
+          enablePhotoEdit: _enablePhotoEdit,
         ),
       ),
     );
@@ -47,6 +49,20 @@ class _MyHomePageState extends State<MyHomePage> {
     if (result != null && result is List) {
       setState(() {
         _selectedMedia = List<File>.from(result);
+      });
+    }
+  }
+
+  Future<void> _editImage(int index) async {
+    final file = _selectedMedia[index];
+    final edited = await PhotoEditorScreen.open(
+      context: context,
+      file: file,
+      initialQuality: 85,
+    );
+    if (edited != null) {
+      setState(() {
+        _selectedMedia[index] = edited;
       });
     }
   }
@@ -72,11 +88,33 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _openGallery,
-              icon: const Icon(Icons.photo_library),
-              label: const Text('Open Gallery'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _openGallery,
+                    icon: const Icon(Icons.photo_library),
+                    label: const Text('Open Gallery'),
+                  ),
+                  const SizedBox(width: 16),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Switch(
+                        value: _enablePhotoEdit,
+                        onChanged: (val) {
+                          setState(() {
+                            _enablePhotoEdit = val;
+                          });
+                        },
+                      ),
+                      const Text('Edit Photo'),
+                    ],
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -140,12 +178,36 @@ class _MyHomePageState extends State<MyHomePage> {
                                 Image.file(
                                   file,
                                   fit: BoxFit.cover,
+                                  key: ValueKey(file.path),
                                   errorBuilder: (context, error, stackTrace) {
                                     return const Center(
                                       child: Icon(Icons.broken_image, size: 40),
                                     );
                                   },
                                 ),
+
+                              // Edit button for images
+                              if (!isVideo)
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.edit_rounded,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                      tooltip: 'Edit with Bicubic Resizer',
+                                      onPressed: () => _editImage(index),
+                                    ),
+                                  ),
+                                ),
+
                               Positioned(
                                 bottom: 0,
                                 left: 0,
